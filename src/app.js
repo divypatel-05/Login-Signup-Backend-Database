@@ -4,6 +4,8 @@ const app = express();
 const path = require("path");
 const hbs = require("hbs");
 const bcrypt = require("bcryptjs");
+const cookieParser = require("cookie-parser");
+const auth = require("./middleware/auth");
 const Port = process.env.PORT || 8000;
 
 require("./db/connect");
@@ -16,6 +18,7 @@ const partialPath = path.join(__dirname, "../template/partials");
 
 app.use(express.urlencoded({extended : false}));
 app.use(express.static(staticPath));
+app.use(cookieParser());
 app.set("view engine", "hbs");
 app.set("views", viewsPath);
 hbs.registerPartials(partialPath);
@@ -26,6 +29,11 @@ app.get("/", (req, res) => {
     res.render("index");
 });
 
+app.get("/secret", auth, (req, res) => {
+    // console.log(`User Valid token from cookie is ${req.cookies.jwt}`);
+    res.render("secret");
+});
+
 app.get("/Registration", (req, res) => {
     res.render("registration");
 });
@@ -34,12 +42,33 @@ app.get("/Login", (req, res) => {
     res.render("login");
 });
 
+app.get("/Logout", auth, async (req, res) => {
+    try {
+
+        //Single devise logout
+        req.user.tokens = req.user.tokens.filter((currEl) => {
+            return currEl.token != req.token;
+        })
+
+        //all devise log out
+        req.user.tokens = [];
+
+        res.clearCookie("jwt");
+        console.log("Logged Out Successfully!");
+        await req.user.save();
+        res.render("login");
+
+    } catch (error) {
+        res.status(500).send(error)
+    }
+});
+
 app.post("/Registration", async (req, res) => {
     try{
         const password = req.body.password;
         const cpassword = req.body.confirmpassword;
-        console.log(password);
-        console.log(cpassword);
+        // console.log(password);
+        // console.log(cpassword);
         
         if(password === cpassword){
             const addEmployee = new Employee({
@@ -54,7 +83,14 @@ app.post("/Registration", async (req, res) => {
             });
             //middleware
             const token = await addEmployee.generateAuthToken();
-            console.log(`App.js walu token ${token}`);
+            // console.log(`App.js walu token ${token}`);
+
+            // res.cookie("jwt", token);
+            res.cookie("jwt", token, {
+                expires : new Date(Date.now() + 30000),
+                httpOnly : true
+            });
+            // console.log("cookie created successfully");
 
             const registered = await addEmployee.save();
             res.status(201).render("index");
@@ -64,7 +100,6 @@ app.post("/Registration", async (req, res) => {
     }catch(err){
         res.status(400).send(err);
     }
-    
 });
 
 app.post("/Login", async (req, res) => {
@@ -75,13 +110,21 @@ app.post("/Login", async (req, res) => {
         if (!userdata) {
             return res.send("Invalid Email");
         }
-        console.log(password);
-        console.log(userdata.password);
+        // console.log(password);
+        // console.log(userdata.password);
         const passwordMatch = await bcrypt.compare(password, userdata.password);
-        console.log(passwordMatch);
+        // console.log(passwordMatch);
 
         const token = await userdata.generateAuthToken();
-        console.log(token);
+        // console.log(token);
+
+        res.cookie("jwt", token, {
+            expires : new Date(Date.now() + 600000),
+            httpOnly : true,
+            // secure : true
+        });
+        // console.log("cookie created successfully");
+
         if(passwordMatch == true){
             res.status(201).render("index");
         }

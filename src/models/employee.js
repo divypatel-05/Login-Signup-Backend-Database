@@ -49,13 +49,13 @@ const employeeSchema = new mongoose.Schema({
 employeeSchema.methods.generateAuthToken = async function(){
     try {
         // console.log(`This.id is ${this._id}`);
-        const token = jwt.sign({_id : this._id.toString()}, "process.env.SECRET_KEY");
+        const token = jwt.sign({_id : this._id.toString()}, process.env.SECRET_KEY);
         // console.log(`Employee.js Walu token ${token}`);
         this.tokens = this.tokens.concat({token : token});
         await this.save();
         return token;
     } catch (error) {
-        res.send(error)
+        res.send(error);
     }
 }
 
